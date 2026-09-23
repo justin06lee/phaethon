@@ -114,6 +114,21 @@ an image rebuild.
 
 `make update` is a rebuild followed by `phaethon sync`.
 
+## Logins and taking over
+
+```sh
+phaethon secret set github --username octo@example.com --site github.com --totp
+phaethon secret import ~/Downloads/passwords.csv
+phaethon view                          # every desk, live, in your browser
+```
+
+These are bangboo's `secret` and `view` commands under phaethon's name.
+Logins are stored on the hosts. An agent types `{{github}}` and never sees
+the password, and a login stays on its own site. In the live view, clicking
+into a desk's screen takes it over, and the agent waits until you hand it
+back. [bangboo's README](https://github.com/justin06lee/bangboo#store-your-logins)
+covers both.
+
 ## Check it
 
 ```sh
@@ -142,8 +157,14 @@ After `phaethon install`, a new agent session has bangboo's tools. It also
 has the phaethon skill, [`skills/phaethon/SKILL.md`](skills/phaethon/SKILL.md),
 which the harness loads when a task needs a computer. The skill covers
 which tool to use when, how to read pages as text instead of squinting at
-screenshots, keys and coordinates, running several desks at once, and
-cleaning up.
+screenshots, keys and coordinates, logging in with stored secrets instead of
+asking for passwords, handing a desk to the user when a step needs a person,
+running several desks at once, and cleaning up.
+
+Asked only to log into a test site, with no mention of the vault, Claude
+Code found the stored login with `secrets` and typed it as placeholders. It
+reached the secure page in 44 seconds, and the password never passed
+through it.
 
 Asked headlessly to find the top Hacker News story and summarize its
 article, Claude Code (Sonnet) loaded the skill and made five tool calls:

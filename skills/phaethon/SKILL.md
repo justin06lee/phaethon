@@ -125,9 +125,37 @@ heavy work (`mem_mb=2048`) on a host with room.
 | An element number fails | The page changed. `browser_read` again and use the new numbers. |
 | Clicked but nothing happened | Look at the screenshot. The target may have moved, or it needed a double click or a wait. Try `zoom`. |
 | A dialog or popup blocks the page | Deal with it through `computer`: `Escape`, or click its button. |
+| "a person has taken this desk over" | The user is using it through the live view. Wait, look with `screenshot` or `browser_read`, and go on once `desk_list` no longer says they have it. |
+| "refused: {{name}} is only for …" | The page is not the site the login belongs to. Check the address: it may be a lookalike. Don't try the secret anywhere else. |
 
-Never type the user's passwords or secrets into a desk unless they gave
-them to you for that purpose.
+## Logging in: the user's stored secrets
+
+Never ask the user to paste a password into the chat. Call `secrets`
+first: it lists the logins they stored, with the account, the fields and
+the sites each one is for. It never shows the values. Then type
+**placeholders**, and the host fills them in on the way to the desk:
+
+- `browser_type index=1 text={{github.username}}`
+- `browser_type index=2 text={{github}} submit=true` (the password)
+- `browser_type index=5 text={{github.totp}}` (the current 2FA code, when a seed is stored)
+- `{{name.FIELD}}` for any other field, e.g. an API token in `shell`:
+  `curl -H 'Authorization: Bearer {{openai.token}}' ...`
+
+The `computer` tool's `type` fills them in too. Click into the field first.
+A login bound to a site is refused anywhere else: on another site, in a
+terminal, in the address bar, or in `shell`. Anything the desk sends back
+shows the placeholder, never the value. When there is no stored login, ask
+the user to add one (`bangboo secret set NAME --username U --site HOST`),
+or to log in themselves through the live view.
+
+## When the user needs to step in
+
+Some steps need a person: a CAPTCHA, a code sent to their phone, a payment
+to confirm, a login with no stored secret. `desk_view` returns a link. Give
+it to them and say what they need to do. Once they click into the screen
+they have the desk. Your actions on it are refused until they press Hand
+back, but `screenshot`, `browser_read` and `desk_list` still work, so check
+back with those. They can also just watch you work through the same link.
 
 ## Without MCP: the bangboo CLI
 
@@ -159,4 +187,6 @@ phaethon doctor              # what is installed, registered and reachable
 phaethon scan                # hollows on the user's makima / Tailscale networks
 phaethon host add MACHINE    # make any Linux box with KVM a host, over ssh
 phaethon sync                # bring hosts, images and harnesses up to date
+phaethon view                # watch every desk live, and take one over
+phaethon secret set NAME --username U --site HOST   # a login agents type as {{NAME}}
 ```
