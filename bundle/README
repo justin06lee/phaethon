@@ -1,0 +1,10 @@
+The Makefile puts the binaries phaethon carries here, and they are embedded
+into it:
+
+  hollow-linux-amd64       installed on hosts, over ssh
+  hollow-<os>-<arch>       the hollow CLI for this machine
+  bangboo-<os>-<arch>      bangboo for this machine
+  versions.json            which version of each
+
+They are build output and are not committed. This file keeps the directory
+in existence for the embed directive.
