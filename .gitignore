@@ -1,0 +1,12 @@
+# build output
+/build/
+/.cache/
+
+# the bundled binaries: built from hollow and bangboo by the Makefile
+/bundle/*
+!/bundle/README
+
+# os / editor junk
+.DS_Store
+.idea/
+.vscode/
