@@ -13,6 +13,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 )
@@ -32,6 +33,8 @@ const usage = `phaethon — computers for every agent on this machine.
   phaethon sync                bring everything up to date: this machine's
                                programs and harnesses, every host's hollow, images
   phaethon doctor [--deep]     check it all; --deep also drives a real desk
+  phaethon view [DESK]         watch desks live in your browser, and take one over
+  phaethon secret ...          store logins agents type as {{name}} (bangboo secret)
   phaethon uninstall           undo phaethon install
   phaethon version
 
@@ -58,6 +61,9 @@ func main() {
 		err = cmdHost(ctx, args)
 	case "scan", "discover":
 		err = runBangboo(ctx, append([]string{"host", "scan"}, args...)...)
+	case "view", "watch", "secret", "secrets", "vault":
+		// bangboo's own commands, under the name people install.
+		passthrough(ctx, append([]string{os.Args[1]}, args...))
 	case "sync", "update":
 		err = cmdSync(ctx, args)
 	case "doctor", "check":
@@ -84,4 +90,19 @@ func orDash(s string) string {
 		return "-"
 	}
 	return s
+}
+
+// passthrough runs a bangboo command as if it were phaethon's, and exits
+// as it did: bangboo has already said whatever went wrong.
+func passthrough(ctx context.Context, args []string) {
+	err := runBangboo(ctx, args...)
+	var exit *exec.ExitError
+	switch {
+	case err == nil:
+		os.Exit(0)
+	case errors.As(err, &exit):
+		os.Exit(exit.ExitCode())
+	}
+	fmt.Fprintf(os.Stderr, "phaethon: bangboo: %v — has phaethon install run?\n", err)
+	os.Exit(1)
 }
