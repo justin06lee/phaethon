@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/phaethon.svg" alt="phaethon" width="340" />
+<img src="assets/phaethon.png" alt="phaethon" width="256" />
 
 # phaethon
 
