@@ -14,7 +14,7 @@ func intp(n int) *int                     { return &n }
 func durp(d time.Duration) *time.Duration { return &d }
 func sh(t *testing.T, script string) string {
 	t.Helper()
-	out, err := exec.Command("sh", "-c", script).CombinedOutput()
+	out, err := exec.Command(testShell, "-c", script).CombinedOutput()
 	if err != nil {
 		t.Fatalf("sh: %v\n%s\n--- script:\n%s", err, out, script)
 	}
@@ -169,3 +169,12 @@ func TestInstallScript(t *testing.T) {
 		t.Errorf("env file = %q", data)
 	}
 }
+
+// testShell runs the scripts meant for hosts: dash when it is here, the
+// strictest sh a host is likely to have.
+var testShell = func() string {
+	if p, err := exec.LookPath("dash"); err == nil {
+		return p
+	}
+	return "sh"
+}()
