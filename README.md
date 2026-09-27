@@ -40,7 +40,7 @@ them if they are not there. It bundles them into phaethon, installs it, and
 runs `phaethon install`:
 
 ```
-  installed bangboo and hollow in ~/.local/bin
+  installed bangboo and hollow in ~/.local/bin (bangboo v0.2.0, hollow v0.3.0)
   Claude Code     bangboo registered as an MCP server
   Codex           bangboo registered as an MCP server
   Gemini CLI      bangboo registered as an MCP server
@@ -52,7 +52,10 @@ runs `phaethon install`:
 
 Only harnesses that are installed are touched. Where a harness has a command
 for adding MCP servers, that command is used. Where phaethon edits a config
-file, the first version is kept beside it as `*.before-phaethon`. The skill
+file itself (JSON, JSONC like OpenCode's `opencode.jsonc`, or Codex's TOML),
+it changes only bangboo's entry: the order of keys, the indentation and the
+comments stay as they were. The first version of each file is kept beside
+it as `*.before-phaethon`. The skill
 goes in through [bmo](https://github.com/justin06lee/bmo) when it is
 present, and is copied into each harness's skills folder when it is not.
 
@@ -68,7 +71,7 @@ phaethon host add tenet
 
 ```
   reached root@tenet over ssh
-  sending hollow v0.2.0 (16 MB)
+  sending hollow v0.3.0 (17 MB)
   installing it as a service (QEMU too, if it is missing)
   hollow is running on root@tenet, and will be after every boot
   bangboo can reach tenet at http://tenet.makima:7070
@@ -93,6 +96,11 @@ Running it again on a machine that is already a host upgrades hollow there
 and refreshes its registration. From another laptop, the same command adds
 the same host to that laptop.
 
+`--idle 2h` has the host stop desks nobody has used for two hours, and
+`--port 7171` moves hollow off its usual 7070. Both are kept on the host, in
+`/etc/hollow.env`, so upgrades and `phaethon sync` leave them alone. Adding
+the host again changes only what you pass (`--idle 0` turns the timeout off).
+
 ```sh
 phaethon host ls                      # hosts, where they answer, which phaethon manages
 phaethon scan                         # hollows on your networks that you have not added
@@ -107,10 +115,11 @@ phaethon sync
 ```
 
 This reinstalls this machine's programs, harness registrations and skill.
-It upgrades hollow on every host phaethon manages, skipping any host with
-desks running unless you pass `--force`. It then builds or rebuilds any
-image that is missing or from an older recipe. Desks keep running through
-an image rebuild.
+It upgrades hollow on every host phaethon manages, keeping each one's port
+and idle timeout, and skipping any host with desks running unless you pass
+`--force`. Once each upgraded host answers again, it builds or rebuilds
+any image that is missing or from an older recipe. Desks keep running
+through an image rebuild.
 
 `make update` is a rebuild followed by `phaethon sync`.
 
@@ -197,6 +206,8 @@ Hosts keep running. `phaethon host rm NAME --uninstall` takes hollow off one.
 main.go          commands
 bundle.go        what phaethon carries, and where it installs it
 harness.go       registering bangboo with each harness, installing the skill
+jsonedit.go      changing one key of a JSON or JSONC file, leaving the rest as it was
+tomledit.go      the same for the tables of Codex's config.toml
 hosts.go         host add / rm: hollow over ssh, connect codes, bangboo registration
 remote.go        ssh: finding a way in, running scripts, sending files
 sync.go          sync, image builds, doctor

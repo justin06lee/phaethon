@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -89,6 +90,28 @@ func ensureImage(ctx context.Context, name, code string) error {
 	return fmt.Errorf("%s does not answer; cannot build its image", name)
 }
 
+// waitForHost waits until bangboo reaches the host and finds it running
+// version.
+func waitForHost(ctx context.Context, name, version string, within time.Duration) error {
+	deadline := time.Now().Add(within)
+	for {
+		rows, _ := hostRows(ctx)
+		for _, h := range rows {
+			if h.Name == name && h.Error == "" && (version == "" || h.Version == version) {
+				return nil
+			}
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("%s: does not answer as hollow %s since the upgrade", name, orDash(version))
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
+}
+
 func cmdSync(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
 	force := fs.Bool("force", false, "upgrade hosts even when desks are running on them (it stops those desks)")
@@ -129,13 +152,18 @@ func cmdSync(ctx context.Context, args []string) error {
 					say("%s: %v", h.Name, err)
 					continue
 				}
-				if err := setupHollow(ctx, r, 7070, 0); err != nil {
+				// An empty hostSettings: the host keeps its port and idle
+				// timeout.
+				if _, err := setupHollow(ctx, r, hostSettings{}); err != nil {
 					say("%s: %v", h.Name, err)
 					continue
 				}
-				// The upgrade restarted it; let it come back before asking
-				// about images.
-				time.Sleep(2 * time.Second)
+				// The upgrade restarted it; wait for it to come back before
+				// asking about images.
+				if err := waitForHost(ctx, h.Name, want, time.Minute); err != nil {
+					say("%v", err)
+					continue
+				}
 			}
 		} else {
 			say("%s: hollow %s, current", h.Name, h.Version)
@@ -240,9 +268,13 @@ func cmdDoctor(ctx context.Context, args []string) error {
 		}
 	}
 
-	if *deep && usable > 0 {
+	if *deep {
 		fmt.Println("\na desk, end to end:")
-		deepCheck(ctx, add)
+		if usable > 0 {
+			deepCheck(ctx, add)
+		} else {
+			add(check{false, "no host can start a desk, so none was tried", "fix the hosts above"})
+		}
 	}
 	fmt.Println()
 	if failed > 0 {
@@ -252,7 +284,29 @@ func cmdDoctor(ctx context.Context, args []string) error {
 	return nil
 }
 
+// bangbooDir is where bangboo keeps its state, as bangboo works it out.
+func bangbooDir() string {
+	if v := os.Getenv("BANGBOO_HOME"); v != "" {
+		return v
+	}
+	if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
+		return filepath.Join(v, "bangboo")
+	}
+	return home(".config", "bangboo")
+}
+
 func deepCheck(ctx context.Context, add func(check)) {
+	// bangboo's CLI remembers the desk it last worked on in a file, and the
+	// check's desk_new and desk_close move it: put back whatever the user had.
+	current := filepath.Join(bangbooDir(), "current")
+	saved, readErr := os.ReadFile(current)
+	defer func() {
+		if readErr == nil {
+			_ = os.WriteFile(current, saved, 0o600)
+		} else if errors.Is(readErr, os.ErrNotExist) {
+			_ = os.Remove(current)
+		}
+	}()
 	env := append(os.Environ(), "BANGBOO_DESK=")
 	call := func(args ...string) (string, error) {
 		cmd := exec.CommandContext(ctx, bangbooPath(), append([]string{"call"}, args...)...)

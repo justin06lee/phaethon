@@ -26,7 +26,8 @@ const usage = `phaethon — computers for every agent on this machine.
                                every agent harness here, install the skill
   phaethon host add MACHINE    make a Linux machine a host, over ssh: MACHINE is
                                anything ssh reaches (tenet, tenet.makima,
-                               root@100.101.102.103), or "local" for this one
+                               root@100.101.102.103), or "local" for this one;
+                               --idle 2h and --port N are kept on the host
   phaethon host ls             the hosts, and whether each answers
   phaethon host rm NAME        forget a host (--uninstall also removes hollow from it)
   phaethon scan                find hollows on your makima and Tailscale networks
