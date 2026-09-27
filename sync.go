@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -267,9 +268,13 @@ func cmdDoctor(ctx context.Context, args []string) error {
 		}
 	}
 
-	if *deep && usable > 0 {
+	if *deep {
 		fmt.Println("\na desk, end to end:")
-		deepCheck(ctx, add)
+		if usable > 0 {
+			deepCheck(ctx, add)
+		} else {
+			add(check{false, "no host can start a desk, so none was tried", "fix the hosts above"})
+		}
 	}
 	fmt.Println()
 	if failed > 0 {
@@ -279,7 +284,29 @@ func cmdDoctor(ctx context.Context, args []string) error {
 	return nil
 }
 
+// bangbooDir is where bangboo keeps its state, as bangboo works it out.
+func bangbooDir() string {
+	if v := os.Getenv("BANGBOO_HOME"); v != "" {
+		return v
+	}
+	if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
+		return filepath.Join(v, "bangboo")
+	}
+	return home(".config", "bangboo")
+}
+
 func deepCheck(ctx context.Context, add func(check)) {
+	// bangboo's CLI remembers the desk it last worked on in a file, and the
+	// check's desk_new and desk_close move it: put back whatever the user had.
+	current := filepath.Join(bangbooDir(), "current")
+	saved, readErr := os.ReadFile(current)
+	defer func() {
+		if readErr == nil {
+			_ = os.WriteFile(current, saved, 0o600)
+		} else if errors.Is(readErr, os.ErrNotExist) {
+			_ = os.Remove(current)
+		}
+	}()
 	env := append(os.Environ(), "BANGBOO_DESK=")
 	call := func(args ...string) (string, error) {
 		cmd := exec.CommandContext(ctx, bangbooPath(), append([]string{"call"}, args...)...)
