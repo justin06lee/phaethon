@@ -2,13 +2,11 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 )
@@ -81,7 +79,7 @@ var harnesses = []harness{
 		},
 		registered: func() bool {
 			data, _ := os.ReadFile(home(".codex", "config.toml"))
-			return bytes.Contains(data, []byte("[mcp_servers.bangboo]"))
+			return tomlHasServer(string(data))
 		},
 	},
 	{
@@ -92,8 +90,7 @@ var harnesses = []harness{
 				_ = quiet("gemini", "mcp", "remove", "-s", "user", "bangboo")
 				return quiet("gemini", "mcp", "add", "-s", "user", "bangboo", bin, "mcp")
 			}
-			return jsonSet(home(".gemini", "settings.json"), []string{"mcpServers", "bangboo"},
-				map[string]any{"command": bin, "args": []string{"mcp"}})
+			return jsonSet(home(".gemini", "settings.json"), stdio(bin), "mcpServers", "bangboo")
 		},
 		unregister: func() error {
 			if onPath("gemini") {
@@ -107,8 +104,7 @@ var harnesses = []harness{
 		name:    "Cursor",
 		present: func() bool { return exists(home(".cursor")) },
 		register: func(bin string) error {
-			return jsonSet(home(".cursor", "mcp.json"), []string{"mcpServers", "bangboo"},
-				map[string]any{"command": bin, "args": []string{"mcp"}})
+			return jsonSet(home(".cursor", "mcp.json"), stdio(bin), "mcpServers", "bangboo")
 		},
 		unregister: func() error { return jsonDelete(home(".cursor", "mcp.json"), "mcpServers", "bangboo") },
 		registered: func() bool { return jsonHas(home(".cursor", "mcp.json"), "mcpServers", "bangboo") },
@@ -117,8 +113,7 @@ var harnesses = []harness{
 		name:    "Claude Desktop",
 		present: func() bool { return exists(filepath.Dir(claudeDesktopConfig())) },
 		register: func(bin string) error {
-			return jsonSet(claudeDesktopConfig(), []string{"mcpServers", "bangboo"},
-				map[string]any{"command": bin, "args": []string{"mcp"}})
+			return jsonSet(claudeDesktopConfig(), stdio(bin), "mcpServers", "bangboo")
 		},
 		unregister: func() error { return jsonDelete(claudeDesktopConfig(), "mcpServers", "bangboo") },
 		registered: func() bool { return jsonHas(claudeDesktopConfig(), "mcpServers", "bangboo") },
@@ -127,12 +122,56 @@ var harnesses = []harness{
 		name:    "OpenCode",
 		present: func() bool { return onPath("opencode") || exists(home(".config", "opencode")) },
 		register: func(bin string) error {
-			return jsonSet(home(".config", "opencode", "opencode.json"), []string{"mcp", "bangboo"},
-				map[string]any{"type": "local", "command": []string{bin, "mcp"}, "enabled": true})
+			return jsonSet(opencodeConfig(), opencodeServer{Type: "local", Command: []string{bin, "mcp"}, Enabled: true}, "mcp", "bangboo")
 		},
-		unregister: func() error { return jsonDelete(home(".config", "opencode", "opencode.json"), "mcp", "bangboo") },
-		registered: func() bool { return jsonHas(home(".config", "opencode", "opencode.json"), "mcp", "bangboo") },
+		unregister: func() error {
+			for _, f := range opencodeConfigs() {
+				if err := jsonDelete(f, "mcp", "bangboo"); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+		registered: func() bool { return jsonHas(opencodeConfig(), "mcp", "bangboo") },
 	},
+}
+
+// stdioServer is how most harnesses write a server they start themselves:
+// the fields in the order people write them.
+type stdioServer struct {
+	Command string   `json:"command"`
+	Args    []string `json:"args"`
+}
+
+func stdio(bin string) stdioServer { return stdioServer{Command: bin, Args: []string{"mcp"}} }
+
+type opencodeServer struct {
+	Type    string   `json:"type"`
+	Command []string `json:"command"`
+	Enabled bool     `json:"enabled"`
+}
+
+// OpenCode reads opencode.json and opencode.jsonc from its config folder.
+func opencodeConfigs() []string {
+	dir := home(".config", "opencode")
+	return []string{filepath.Join(dir, "opencode.jsonc"), filepath.Join(dir, "opencode.json")}
+}
+
+// opencodeConfig is the one bangboo goes in: the file that already has it,
+// or else the one there is, opencode.json when there is neither.
+func opencodeConfig() string {
+	files := opencodeConfigs()
+	for _, f := range files {
+		if jsonHas(f, "mcp", "bangboo") {
+			return f
+		}
+	}
+	for _, f := range files {
+		if exists(f) {
+			return f
+		}
+	}
+	return files[1]
 }
 
 // backup keeps the first version of a config file phaethon touches, beside
@@ -146,29 +185,19 @@ func backup(path string) {
 	}
 }
 
-func readJSON(path string) (map[string]any, error) {
+// readConfig reads a config file; one that is not there is empty.
+func readConfig(path string) ([]byte, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return map[string]any{}, nil
+		return nil, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-	m := map[string]any{}
-	if len(bytes.TrimSpace(data)) == 0 {
-		return m, nil
-	}
-	if err := json.Unmarshal(data, &m); err != nil {
-		return nil, fmt.Errorf("%s is not plain JSON (%v); add bangboo to it by hand", path, err)
-	}
-	return m, nil
+	return data, err
 }
 
-func writeJSON(path string, m map[string]any) error {
-	data, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return err
-	}
+// writeConfig replaces a config file with data, keeping its permissions,
+// after keeping its first version beside it.
+func writeConfig(path string, data []byte) error {
+	backup(path)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -177,95 +206,72 @@ func writeJSON(path string, m map[string]any) error {
 		mode = st.Mode().Perm()
 	}
 	tmp := path + ".phaethon-tmp"
-	if err := os.WriteFile(tmp, append(data, '\n'), mode); err != nil {
+	if err := os.WriteFile(tmp, data, mode); err != nil {
 		return err
 	}
 	return os.Rename(tmp, path)
 }
 
-func jsonSet(path string, keys []string, value any) error {
-	m, err := readJSON(path)
+func jsonSet(path string, value any, keys ...string) error {
+	data, err := readConfig(path)
 	if err != nil {
 		return err
 	}
-	backup(path)
-	cur := m
-	for _, k := range keys[:len(keys)-1] {
-		next, ok := cur[k].(map[string]any)
-		if !ok {
-			next = map[string]any{}
-			cur[k] = next
-		}
-		cur = next
+	out, err := jsonSetText(data, keys, value)
+	if err != nil {
+		return fmt.Errorf("%s: %v; add bangboo to it by hand", path, err)
 	}
-	cur[keys[len(keys)-1]] = value
-	return writeJSON(path, m)
+	if bytes.Equal(out, data) {
+		return nil
+	}
+	return writeConfig(path, out)
 }
 
-func jsonDelete(path, section, key string) error {
-	m, err := readJSON(path)
-	if err != nil || len(m) == 0 {
+func jsonDelete(path string, keys ...string) error {
+	data, err := readConfig(path)
+	if err != nil {
 		return err
 	}
-	sec, ok := m[section].(map[string]any)
-	if !ok {
-		return nil
-	}
-	if _, ok := sec[key]; !ok {
-		return nil
-	}
-	delete(sec, key)
-	return writeJSON(path, m)
-}
-
-func jsonHas(path, section, key string) bool {
-	m, err := readJSON(path)
+	out, found, err := jsonDeleteText(data, keys)
 	if err != nil {
-		return false
+		return fmt.Errorf("%s: %v; take bangboo out of it by hand", path, err)
 	}
-	sec, ok := m[section].(map[string]any)
-	if !ok {
-		return false
+	if !found {
+		return nil
 	}
-	_, ok = sec[key]
-	return ok
+	return writeConfig(path, out)
 }
 
-var tomlBlock = regexp.MustCompile(`(?ms)^\[mcp_servers\.bangboo\]\n.*?(^\[|\z)`)
+func jsonHas(path string, keys ...string) bool {
+	data, err := readConfig(path)
+	return err == nil && jsonHasText(data, keys)
+}
 
 func tomlServer(path, bin string) error {
-	data, _ := os.ReadFile(path)
-	backup(path)
-	block := fmt.Sprintf("[mcp_servers.bangboo]\ncommand = %q\nargs = [\"mcp\"]\n\n", bin)
-	s := string(data)
-	if tomlBlock.MatchString(s) {
-		s = tomlBlock.ReplaceAllStringFunc(s, func(m string) string {
-			if strings.HasSuffix(m, "[") {
-				return block + "["
-			}
-			return block
-		})
-	} else {
-		if s != "" && !strings.HasSuffix(s, "\n") {
-			s += "\n"
-		}
-		s += "\n" + block
+	data, err := readConfig(path)
+	if err != nil {
+		return err
 	}
-	return os.WriteFile(path, []byte(s), 0o644)
+	out, err := tomlSetServer(string(data), bin)
+	if err != nil {
+		return fmt.Errorf("%s: %v", path, err)
+	}
+	if out == string(data) {
+		return nil
+	}
+	return writeConfig(path, []byte(out))
 }
 
 func tomlRemove(path string) error {
-	data, err := os.ReadFile(path)
+	data, err := readConfig(path)
 	if err != nil {
+		return err
+	}
+	out, found := tomlRemoveServer(string(data))
+	if !found {
 		return nil
 	}
-	s := tomlBlock.ReplaceAllStringFunc(string(data), func(m string) string {
-		if strings.HasSuffix(m, "[") {
-			return "["
-		}
-		return ""
-	})
-	return os.WriteFile(path, []byte(s), 0o644)
+	return writeConfig(path, []byte(out))
 }
 
 // The skill goes where each harness looks for skills. bmo, when it is here,

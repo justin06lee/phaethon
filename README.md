@@ -52,7 +52,10 @@ runs `phaethon install`:
 
 Only harnesses that are installed are touched. Where a harness has a command
 for adding MCP servers, that command is used. Where phaethon edits a config
-file, the first version is kept beside it as `*.before-phaethon`. The skill
+file itself (JSON, JSONC like OpenCode's `opencode.jsonc`, or Codex's TOML),
+it changes only bangboo's entry: the order of keys, the indentation and the
+comments stay as they were. The first version of each file is kept beside
+it as `*.before-phaethon`. The skill
 goes in through [bmo](https://github.com/justin06lee/bmo) when it is
 present, and is copied into each harness's skills folder when it is not.
 
@@ -203,6 +206,8 @@ Hosts keep running. `phaethon host rm NAME --uninstall` takes hollow off one.
 main.go          commands
 bundle.go        what phaethon carries, and where it installs it
 harness.go       registering bangboo with each harness, installing the skill
+jsonedit.go      changing one key of a JSON or JSONC file, leaving the rest as it was
+tomledit.go      the same for the tables of Codex's config.toml
 hosts.go         host add / rm: hollow over ssh, connect codes, bangboo registration
 remote.go        ssh: finding a way in, running scripts, sending files
 sync.go          sync, image builds, doctor
