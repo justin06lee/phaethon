@@ -40,7 +40,7 @@ them if they are not there. It bundles them into phaethon, installs it, and
 runs `phaethon install`:
 
 ```
-  installed bangboo and hollow in ~/.local/bin
+  installed bangboo and hollow in ~/.local/bin (bangboo v0.2.0, hollow v0.3.0)
   Claude Code     bangboo registered as an MCP server
   Codex           bangboo registered as an MCP server
   Gemini CLI      bangboo registered as an MCP server
@@ -71,7 +71,7 @@ phaethon host add tenet
 
 ```
   reached root@tenet over ssh
-  sending hollow v0.2.0 (16 MB)
+  sending hollow v0.3.0 (17 MB)
   installing it as a service (QEMU too, if it is missing)
   hollow is running on root@tenet, and will be after every boot
   bangboo can reach tenet at http://tenet.makima:7070
