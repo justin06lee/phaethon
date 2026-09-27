@@ -93,6 +93,11 @@ Running it again on a machine that is already a host upgrades hollow there
 and refreshes its registration. From another laptop, the same command adds
 the same host to that laptop.
 
+`--idle 2h` has the host stop desks nobody has used for two hours, and
+`--port 7171` moves hollow off its usual 7070. Both are kept on the host, in
+`/etc/hollow.env`, so upgrades and `phaethon sync` leave them alone. Adding
+the host again changes only what you pass (`--idle 0` turns the timeout off).
+
 ```sh
 phaethon host ls                      # hosts, where they answer, which phaethon manages
 phaethon scan                         # hollows on your networks that you have not added
@@ -107,10 +112,11 @@ phaethon sync
 ```
 
 This reinstalls this machine's programs, harness registrations and skill.
-It upgrades hollow on every host phaethon manages, skipping any host with
-desks running unless you pass `--force`. It then builds or rebuilds any
-image that is missing or from an older recipe. Desks keep running through
-an image rebuild.
+It upgrades hollow on every host phaethon manages, keeping each one's port
+and idle timeout, and skipping any host with desks running unless you pass
+`--force`. Once each upgraded host answers again, it builds or rebuilds
+any image that is missing or from an older recipe. Desks keep running
+through an image rebuild.
 
 `make update` is a rebuild followed by `phaethon sync`.
 

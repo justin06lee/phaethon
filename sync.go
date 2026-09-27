@@ -89,6 +89,28 @@ func ensureImage(ctx context.Context, name, code string) error {
 	return fmt.Errorf("%s does not answer; cannot build its image", name)
 }
 
+// waitForHost waits until bangboo reaches the host and finds it running
+// version.
+func waitForHost(ctx context.Context, name, version string, within time.Duration) error {
+	deadline := time.Now().Add(within)
+	for {
+		rows, _ := hostRows(ctx)
+		for _, h := range rows {
+			if h.Name == name && h.Error == "" && (version == "" || h.Version == version) {
+				return nil
+			}
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("%s: does not answer as hollow %s since the upgrade", name, orDash(version))
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
+}
+
 func cmdSync(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
 	force := fs.Bool("force", false, "upgrade hosts even when desks are running on them (it stops those desks)")
@@ -129,13 +151,18 @@ func cmdSync(ctx context.Context, args []string) error {
 					say("%s: %v", h.Name, err)
 					continue
 				}
-				if err := setupHollow(ctx, r, 7070, 0); err != nil {
+				// An empty hostSettings: the host keeps its port and idle
+				// timeout.
+				if _, err := setupHollow(ctx, r, hostSettings{}); err != nil {
 					say("%s: %v", h.Name, err)
 					continue
 				}
-				// The upgrade restarted it; let it come back before asking
-				// about images.
-				time.Sleep(2 * time.Second)
+				// The upgrade restarted it; wait for it to come back before
+				// asking about images.
+				if err := waitForHost(ctx, h.Name, want, time.Minute); err != nil {
+					say("%v", err)
+					continue
+				}
 			}
 		} else {
 			say("%s: hollow %s, current", h.Name, h.Version)
