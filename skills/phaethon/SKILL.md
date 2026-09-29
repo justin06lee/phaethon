@@ -1,6 +1,6 @@
 ---
 name: phaethon
-description: Use when a task needs a computer of its own — browsing and using websites (logging in, filling forms, reading pages, downloading files), running or testing desktop or GUI apps, installing and trying software without touching the user's machine, taking screenshots or screen recordings as evidence, or running several such sessions in parallel. Drives desks (small Linux VMs on the user's hollow hosts) through bangboo's MCP tools, or the bangboo CLI when MCP is not available.
+description: Use when a task needs a computer of its own — browsing and using websites (logging in, filling forms, reading pages, downloading files), running or testing desktop or GUI apps, installing and trying software without touching the user's machine, taking screenshots or screen recordings as evidence, or running several such sessions in parallel. Drives desks (small Linux VMs on the user's hollow hosts, or the user's own desktop when they have shared it) through bangboo's MCP tools, or the bangboo CLI when MCP is not available.
 ---
 
 # phaethon: using a computer through bangboo
@@ -10,7 +10,8 @@ unless you ask for another size), Chromium, a terminal, python3 and git, running
 (hollow hosts). bangboo is the bridge. Its tools appear as MCP tools named
 `desk_new`, `computer`, `browser_open` and so on (in Claude Code:
 `mcp__bangboo__desk_new`). Nothing you do on a desk touches the user's own
-machine.
+machine, with one exception the user has to grant: see "The user's own
+desktop".
 
 If those tools are not in your tool list, use the same tools from a shell:
 `bangboo call TOOL key=value ...` (see "Without MCP" below).
@@ -175,6 +176,32 @@ the desk. Your actions on it are refused until they press Hand
 back, but `screenshot`, `browser_read` and `desk_list` still work, so check
 back with those. They can also just watch you work through the same link.
 
+## The user's own desktop
+
+Sometimes the task is on the user's real machine: their open apps, their
+logged-in browser, a file on their screen. They can hand it to you for a
+while with `bangboo local share` (they run it, not you; `--shell` adds
+commands, `--files` adds files, `--for 2h` sets how long). While it is
+shared it shows up as `local/desktop` in `desk_list` and `hosts`, and
+`desk_new host=local` (or `desk_use desk=local`) makes it the current desk.
+Nothing can be attached before that. If you are refused, tell the user what
+to run; do not look for a way round it.
+
+It is a real machine, so it is not the sandbox a VM desk is:
+
+- What you close, type, click or delete is theirs. Work in what they asked
+  about and leave every other window, tab and file alone. If you see
+  something private on the way, do not read it out or act on it.
+- Look before you act: `computer action=screenshot`, then small steps.
+  Coordinates are in the screenshot, as on any desk.
+- If they take it over (`desk_list` says "the user has it"), your actions are
+  refused until they stop for a minute. Wait; screenshots still work.
+- `browser_*` tools, `record_*` and secret placeholders (`{{name}}`) do not
+  exist there: use `computer` on whatever browser is open, and ask the user
+  to type passwords themselves.
+- Keys are the same names as everywhere; `super` is Command on a Mac.
+- `desk_close` ends the share. Do it as soon as you have finished.
+
 ## Without MCP: the bangboo CLI
 
 The same tools work from any shell. The current desk is remembered between
@@ -207,5 +234,6 @@ phaethon scan                # hollows on the user's makima / Tailscale networks
 phaethon host add MACHINE    # make any Linux box with KVM a host, over ssh
 phaethon sync                # bring hosts, images and harnesses up to date
 phaethon view                # watch every desk live, and take one over
+phaethon local share         # give agents this desktop for a while (--shell, --files, --for)
 phaethon secret set NAME --username U --site HOST   # a login agents type as {{NAME}}
 ```

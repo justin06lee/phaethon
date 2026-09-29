@@ -36,6 +36,10 @@ const usage = `phaethon — computers for every agent on this machine.
   phaethon doctor [--deep]     check it all; --deep also drives a real desk
   phaethon view [DESK]         watch desks live in your browser, and take one over
   phaethon secret ...          store logins agents type as {{name}} (bangboo secret)
+  phaethon gateway             serve desks to other apps over HTTP and WebSocket:
+                               a <phaethon-desk> element for pages and Electron
+  phaethon local ...           this machine's own desktop as a desk: share it with
+                               agents for a while, or view it yourself (bangboo local)
   phaethon uninstall           undo phaethon install
   phaethon version
 
@@ -62,7 +66,7 @@ func main() {
 		err = cmdHost(ctx, args)
 	case "scan", "discover":
 		err = runBangboo(ctx, append([]string{"host", "scan"}, args...)...)
-	case "view", "watch", "secret", "secrets", "vault":
+	case "view", "watch", "secret", "secrets", "vault", "gateway", "local":
 		// bangboo's own commands, under the name people install.
 		passthrough(ctx, append([]string{os.Args[1]}, args...))
 	case "sync", "update":
