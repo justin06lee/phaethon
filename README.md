@@ -138,6 +138,47 @@ into a desk's screen takes it over, and the agent waits until you hand it
 back. [bangboo's README](https://github.com/justin06lee/bangboo#store-your-logins)
 covers both.
 
+## Your own desktop
+
+```sh
+phaethon view local            # this machine's desktop, live, in your browser
+phaethon local share --for 2h  # let agents use it: screen, pointer, keyboard
+phaethon local unshare
+```
+
+Desks are VMs, so an agent on one never touches your machine. `local` is the
+exception, and it is yours to grant: the desktop you are sitting at, with no VM
+and no host, for a time you name and the parts you name (`--shell` adds
+commands, `--files` adds files). You always have it; an agent has it only
+while a share runs, and it waits whenever you are using the desk. It is
+consent and not a sandbox: an agent that can use your keyboard can open a
+terminal. macOS needs Screen Recording and Accessibility for the app that runs
+bangboo, and Linux an X11 session. [bangboo's README](https://github.com/justin06lee/bangboo#your-own-desktop)
+has the details.
+
+## Use it from another app
+
+```sh
+phaethon gateway               # http://127.0.0.1:7077
+```
+
+`phaethon gateway` is bangboo's gateway: the tools and the live desks over HTTP
+and WebSocket, and a `<phaethon-desk>` element that shows a desk in a page and
+lets the person click into it. An Electron app, a website or a program in any
+language can use it. Your backend mints a short-lived embed token for one desk
+with the master token, which never reaches a page; the page loads
+`/embed/phaethon-desk.js` and gets the desk:
+
+```html
+<script src="http://127.0.0.1:7077/embed/phaethon-desk.js"></script>
+<phaethon-desk src="http://127.0.0.1:7077" desk="tenet/ab12cd" token="bbe_…" controls></phaethon-desk>
+```
+
+It listens on loopback only, and other pages may embed it only if you name them
+with `--allow-origin`. The desk can be a VM or `local/desktop`. See
+[bangboo's README](https://github.com/justin06lee/bangboo#embedding) for the
+API, the Electron and iframe examples, and the security model.
+
 ## Check it
 
 ```sh
@@ -198,7 +239,10 @@ Hosts keep running. `phaethon host rm NAME --uninstall` takes hollow off one.
   let it ssh in as root.
 - **The binaries are built for this machine.** A phaethon built on an M1 Mac
   carries darwin/arm64 bangboo and hollow CLIs, plus the linux/amd64 hollow
-  for hosts. Build it again on another kind of machine.
+  for hosts. Build it again on another kind of machine. On a Mac that build
+  needs the Xcode command line tools: bangboo's desktop backend is cgo.
+- **The local desktop is one display, on macOS and X11 Linux.** No Wayland, no
+  Windows, and no browser tools, recording or `{{secrets}}` on it.
 
 ## Layout
 
