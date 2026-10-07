@@ -202,6 +202,17 @@ It is a real machine, so it is not the sandbox a VM desk is:
 - Keys are the same names as everywhere; `super` is Command on a Mac.
 - `desk_close` ends the share. Do it as soon as you have finished.
 
+## The user's other machines
+
+The user can serve another machine's desktop to this one (`phaethon local
+serve` there, then `phaethon host add CODE` here). It is then a host whose
+one desk is `NAME/desktop` — `studio/desktop`, say — listed by `desk_list`
+and `hosts` beside the VM desks, and used with `desk_use desk=studio/desktop`.
+It makes no VMs. Everything above about the user's own desktop holds for it:
+it is a real machine, and you get it only while the user shares it **on that
+machine** (`phaethon local share` there). A refusal says so; tell the user
+which machine to run it on.
+
 ## Without MCP: the bangboo CLI
 
 The same tools work from any shell. The current desk is remembered between
@@ -235,5 +246,7 @@ phaethon host add MACHINE    # make any Linux box with KVM a host, over ssh
 phaethon sync                # bring hosts, images and harnesses up to date
 phaethon view                # watch every desk live, and take one over
 phaethon local share         # give agents this desktop for a while (--shell, --files, --for)
+phaethon local serve         # serve this desktop to the user's other machines (prints a code)
+phaethon host add CODE       # add a host from its code: a hollow, or another machine's desktop
 phaethon secret set NAME --username U --site HOST   # a login agents type as {{NAME}}
 ```

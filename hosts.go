@@ -110,7 +110,18 @@ func hostAdd(ctx context.Context, args []string) error {
 		return err
 	}
 	if len(pos) != 1 {
-		return errors.New("usage: phaethon host add MACHINE   (MACHINE: tenet, tenet.makima, root@100.x.y.z, or local)")
+		return errors.New("usage: phaethon host add MACHINE   (MACHINE: tenet, tenet.makima, root@100.x.y.z, or local)\n" +
+			"   or: phaethon host add CODE      (a connect code: from `hollow connect`, or `phaethon local serve` on a machine whose desktop you want)")
+	}
+	// A connect code names a host that is already serving — a hollow someone
+	// else set up, or another machine's desktop — so there is nothing to set
+	// up over ssh: bangboo just remembers it.
+	if strings.HasPrefix(strings.TrimSpace(pos[0]), "hollow1-") {
+		bargs := []string{"host", "add", pos[0]}
+		if *name != "" {
+			bargs = append(bargs, "--name", *name)
+		}
+		return runBangboo(ctx, bargs...)
 	}
 	// Only what is given changes: adding a host again keeps its port and
 	// idle timeout.

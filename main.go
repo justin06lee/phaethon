@@ -28,6 +28,8 @@ const usage = `phaethon — computers for every agent on this machine.
                                anything ssh reaches (tenet, tenet.makima,
                                root@100.101.102.103), or "local" for this one;
                                --idle 2h and --port N are kept on the host
+  phaethon host add CODE       add a host that is already serving: a hollow's connect
+                               code, or another machine's desktop (phaethon local serve)
   phaethon host ls             the hosts, and whether each answers
   phaethon host rm NAME        forget a host (--uninstall also removes hollow from it)
   phaethon scan                find hollows on your makima and Tailscale networks
@@ -39,7 +41,8 @@ const usage = `phaethon — computers for every agent on this machine.
   phaethon gateway             serve desks to other apps over HTTP and WebSocket:
                                a <phaethon-desk> element for pages and Electron
   phaethon local ...           this machine's own desktop as a desk: share it with
-                               agents for a while, or view it yourself (bangboo local)
+                               agents for a while, view it yourself, or serve it to
+                               your other machines (phaethon local serve)
   phaethon uninstall           undo phaethon install
   phaethon version
 

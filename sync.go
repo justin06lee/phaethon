@@ -20,6 +20,7 @@ type hostRow struct {
 	Reach   string   `json:"reachable_at"`
 	Error   string   `json:"error"`
 	Version string   `json:"version"`
+	Backend string   `json:"backend"` // "desktop": another machine's desktop, served by bangboo local serve
 	FreeMB  int      `json:"free_mb"`
 	Desks   int      `json:"desks"`
 	Images  []struct {
@@ -29,6 +30,10 @@ type hostRow struct {
 		Outdated bool   `json:"outdated"`
 	} `json:"images"`
 }
+
+// desktopBackend is what bangboo host ls says of another machine's desktop
+// (bangboo local serve), where a hollow host names its VMs' backend.
+const desktopBackend = "desktop"
 
 func hostRows(ctx context.Context) ([]hostRow, error) {
 	out, err := bangbooOut(ctx, "host", "ls", "--json")
@@ -136,6 +141,12 @@ func cmdSync(ctx context.Context, args []string) error {
 	for _, h := range rows {
 		if h.Error != "" {
 			say("%s: does not answer (%s)", h.Name, h.Error)
+			continue
+		}
+		// A desktop runs no hollow and has no images: there is nothing here
+		// to bring up to date. Its machine updates its own bangboo.
+		if h.Backend == desktopBackend {
+			say("%s: a desktop, served from that machine (%s)", h.Name, h.Version)
 			continue
 		}
 		if want != "" && h.Version != want {
@@ -249,6 +260,10 @@ func cmdDoctor(ctx context.Context, args []string) error {
 	for _, h := range rows {
 		if h.Error != "" {
 			add(check{false, h.Name + ": does not answer — " + h.Error, "is it on, and on the same makima or Tailscale network as this machine?"})
+			continue
+		}
+		if h.Backend == desktopBackend {
+			add(check{true, fmt.Sprintf("%s: a desktop, served from that machine, answering at %s", h.Name, h.Reach), ""})
 			continue
 		}
 		add(check{true, fmt.Sprintf("%s: answering at %s, %.1f GB free, %d desk(s)", h.Name, h.Reach, float64(h.FreeMB)/1024, h.Desks), ""})
