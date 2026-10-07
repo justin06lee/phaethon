@@ -32,12 +32,21 @@ anywhere.
 ## Install
 
 ```sh
-git clone https://github.com/justin06lee/phaethon && cd phaethon && make
+brew install justin06lee/tap/phaethon && phaethon install
 ```
 
-`make` builds hollow and bangboo from checkouts beside this one, or clones
-them if they are not there. It bundles them into phaethon, installs it, and
-runs `phaethon install`:
+or, without Homebrew:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/justin06lee/phaethon/master/install.sh | sh
+phaethon install
+```
+
+Either way it is one binary with hollow and bangboo inside it, built for your
+machine; nothing is compiled and nothing else is fetched. The script checks the
+download against the release's SHA256SUMS and puts phaethon in `~/.local/bin`
+(`PREFIX=/usr/local` moves it, `PHAETHON_VERSION=v0.4.0` pins one).
+`phaethon install` then installs what it carries and registers it:
 
 ```
   installed bangboo and hollow in ~/.local/bin (bangboo v0.2.0, hollow v0.3.0)
@@ -59,7 +68,12 @@ it as `*.before-phaethon`. The skill
 goes in through [bmo](https://github.com/justin06lee/bmo) when it is
 present, and is copied into each harness's skills folder when it is not.
 
-Needs Go 1.26 or newer to build. It runs on macOS and Linux.
+It runs on macOS and Linux.
+
+To build it yourself, `git clone https://github.com/justin06lee/phaethon && cd
+phaethon && make` builds hollow and bangboo from checkouts beside this one, or
+clones them, bundles them in, and runs `phaethon install`. That needs Go 1.26
+or newer. `versions.env` names the hollow and bangboo a release is built from.
 
 ## Add a host
 
@@ -156,6 +170,20 @@ terminal. macOS needs Screen Recording and Accessibility for the app that runs
 bangboo, and Linux an X11 session. [bangboo's README](https://github.com/justin06lee/bangboo#your-own-desktop)
 has the details.
 
+## Your other machines
+
+```sh
+phaethon local serve           # on the machine whose desktop you want: prints a code
+phaethon host add hollow1-…    # on the machine you are at: it is now NAME/desktop
+```
+
+A served desktop is a host with one desk, the real screen of that machine, and
+no VMs: in `phaethon view`, in any app's gateway, and in agents' `desk_list`,
+beside the VM desks. It listens on loopback and your makima or Tailscale
+addresses. Whoever has the code has that desktop as you do; `--view-only`
+serves just the screen, and `--trust 10.77.0.0/16` lets your makima machines in
+without the code. Agents get it only while you share it on that machine.
+
 ## Use it from another app
 
 ```sh
@@ -175,9 +203,18 @@ with the master token, which never reaches a page; the page loads
 ```
 
 It listens on loopback only, and other pages may embed it only if you name them
-with `--allow-origin`. The desk can be a VM or `local/desktop`. See
-[bangboo's README](https://github.com/justin06lee/bangboo#embedding) for the
-API, the Electron and iframe examples, and the security model.
+with `--allow-origin`. The desk can be a VM, `local/desktop`, or another
+machine's desktop. See [bangboo's README](https://github.com/justin06lee/bangboo#embedding)
+for the API, the Electron and iframe examples, and the security model.
+
+**To ship it inside your app**, so the people who download it need nothing
+else: from npm, `@phaethon/sdk` carries bangboo for macOS and Linux, starts it
+for your app (`bangboo gateway --embedded`), and gives you a client, the
+`<phaethon-desk>` element as a module, and the MCP server to hand your agents.
+From Go, `go get github.com/justin06lee/bangboo` and use its `gateway`,
+`local`, `hosts` and `tools` packages in-process. See bangboo's
+[js/README.md](https://github.com/justin06lee/bangboo/tree/master/js) and
+[In your own program](https://github.com/justin06lee/bangboo#in-your-own-program).
 
 ## Check it
 
