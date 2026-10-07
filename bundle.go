@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // phaethon carries what it installs: bangboo and the hollow CLI for this
@@ -69,13 +70,21 @@ func binDir() string {
 	if self, err := os.Executable(); err == nil {
 		if self, err = filepath.EvalSymlinks(self); err == nil {
 			dir := filepath.Dir(self)
-			if writable(dir) && filepath.Base(filepath.Dir(dir)) != "go-build" && !isTemp(dir) {
+			if writable(dir) && filepath.Base(filepath.Dir(dir)) != "go-build" && !isTemp(dir) && !packaged(dir) {
 				return dir
 			}
 		}
 	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".local", "bin")
+}
+
+// packaged is whether dir belongs to a package manager: Homebrew's Cellar
+// holds one version of phaethon, and brew upgrade deletes it, so what
+// phaethon installs beside itself there would vanish with the next upgrade
+// and leave every harness pointing at nothing.
+func packaged(dir string) bool {
+	return strings.Contains(filepath.ToSlash(dir), "/Cellar/")
 }
 
 func writable(dir string) bool {
