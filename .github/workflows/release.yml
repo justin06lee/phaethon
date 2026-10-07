@@ -1,0 +1,160 @@
+name: release
+
+# A v* tag makes a release: a tarball for each platform on GitHub, with
+# SHA256SUMS, then the Homebrew formula for it in justin06lee/homebrew-tap.
+# Running it by hand releases a tag that is already pushed, for when a run
+# failed part way.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The tag to release, already pushed (v0.4.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+# Two runs for one tag would race to create the same release.
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "$unformatted"
+            echo "::error::gofmt -w the files above"
+            exit 1
+          fi
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  # Each platform is its own build, since each phaethon carries that
+  # platform's bangboo and hollow. bangboo is cgo on a Mac, so the Mac ones
+  # are built on a Mac; on Linux everything is pure Go.
+  build:
+    needs: test
+    name: build ${{ matrix.goos }}-${{ matrix.goarch }}
+    strategy:
+      matrix:
+        include:
+          - { goos: darwin, goarch: arm64, runner: macos-latest }
+          - { goos: darwin, goarch: amd64, runner: macos-latest }
+          - { goos: linux, goarch: amd64, runner: ubuntu-latest }
+          - { goos: linux, goarch: arm64, runner: ubuntu-latest }
+    runs-on: ${{ matrix.runner }}
+    env:
+      TARBALL: dist/phaethon-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      # HOLLOW_REF and BANGBOO_REF: make clones each at its tag.
+      - name: the hollow and bangboo this release carries
+        run: grep -E '^[A-Z_]+=' versions.env | tee -a "$GITHUB_ENV"
+      - run: make dist GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }}
+      - name: check the tarball
+        run: |
+          tar -tzvf "$TARBALL"
+          if [ "$(go env GOHOSTARCH)" = "${{ matrix.goarch }}" ]; then
+            mkdir unpacked && tar -xzf "$TARBALL" -C unpacked
+            got=$(unpacked/phaethon version)
+            want="phaethon $TAG (hollow $HOLLOW_REF, bangboo $BANGBOO_REF)"
+            echo "$got"
+            if [ "$got" != "$want" ]; then
+              echo "::error::phaethon version says '$got', not '$want'"
+              exit 1
+            fi
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phaethon-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ${{ env.TARBALL }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: phaethon-*
+          path: dist
+          merge-multiple: true
+      - run: make checksums
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$TAG" dist/phaethon-*.tar.gz dist/SHA256SUMS --generate-notes --verify-tag
+
+  # The formula is made from the SHA256SUMS the release published, and kept
+  # as an artifact either way. It goes to the tap only when there is a
+  # HOMEBREW_TAP_TOKEN secret: a token that can push to
+  # justin06lee/homebrew-tap, which this repository's own token cannot.
+  homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS --dir dist
+      - name: the formula
+        run: |
+          scripts/formula.sh "$TAG" dist/SHA256SUMS > phaethon.rb
+          ruby -c phaethon.rb
+          cat phaethon.rb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: formula
+          path: phaethon.rb
+      - if: env.HOMEBREW_TAP_TOKEN == ''
+        run: echo "::notice::no HOMEBREW_TAP_TOKEN secret, so the formula is only an artifact of this run"
+      - if: env.HOMEBREW_TAP_TOKEN != ''
+        uses: actions/checkout@v4
+        with:
+          repository: justin06lee/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+      - if: env.HOMEBREW_TAP_TOKEN != ''
+        name: push it to the tap
+        run: |
+          cp phaethon.rb tap/Formula/phaethon.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/phaethon.rb
+          if git diff --cached --quiet; then
+            echo "the tap already has this formula"
+            exit 0
+          fi
+          git commit -m "phaethon ${TAG#v}"
+          git push origin HEAD

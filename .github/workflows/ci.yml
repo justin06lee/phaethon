@@ -1,0 +1,57 @@
+name: ci
+
+# Every branch push and every pull request. Tags are the release workflow's:
+# it runs these same checks before it builds anything.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # The tests need nothing built: bundle/ holds only its README in a fresh
+  # checkout, which is enough for the embed, and nothing under test reads a
+  # bundled binary.
+  test:
+    name: vet, fmt, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "$unformatted"
+            echo "::error::gofmt -w the files above"
+            exit 1
+          fi
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  # install.sh is how most people get phaethon, and it runs under whatever sh
+  # a machine has: here that is dash. It installs a stand-in release from a
+  # local directory, and the formula a release would push is checked too.
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck -s sh install.sh scripts/formula.sh
+      - name: install.sh, under dash, from a stand-in release
+        run: |
+          rel=$(mktemp -d) stage=$(mktemp -d) prefix=$(mktemp -d)
+          printf '#!/bin/sh\necho "phaethon v0.0.0-ci"\n' > "$stage/phaethon"
+          chmod +x "$stage/phaethon"
+          cp LICENSE README.md "$stage/"
+          for p in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do
+            tar -czf "$rel/phaethon-$p.tar.gz" -C "$stage" phaethon LICENSE README.md
+          done
+          (cd "$rel" && sha256sum phaethon-*.tar.gz > SHA256SUMS)
+          PHAETHON_BASE_URL="file://$rel" PREFIX="$prefix" dash install.sh
+          test "$("$prefix/bin/phaethon" version)" = "phaethon v0.0.0-ci"
+          scripts/formula.sh v0.0.0 "$rel/SHA256SUMS" > phaethon.rb
+          ruby -c phaethon.rb
