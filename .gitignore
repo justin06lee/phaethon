@@ -1,5 +1,6 @@
 # build output
 /build/
+/dist/
 /.cache/
 
 # the bundled binaries: built from hollow and bangboo by the Makefile
