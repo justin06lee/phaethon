@@ -21,6 +21,7 @@ type hostRow struct {
 	Error   string   `json:"error"`
 	Version string   `json:"version"`
 	Backend string   `json:"backend"` // "desktop": another machine's desktop, served by bangboo local serve
+	SSH     string   `json:"ssh"`     // how bangboo set it up (bangboo host setup), when it did
 	FreeMB  int      `json:"free_mb"`
 	Desks   int      `json:"desks"`
 	Images  []struct {
@@ -151,6 +152,10 @@ func cmdSync(ctx context.Context, args []string) error {
 		}
 		if want != "" && h.Version != want {
 			mg, ok := managedHosts[h.Name]
+			// A host an app set up through bangboo is reached the way it was.
+			if !ok && h.SSH != "" {
+				mg, ok = managed{SSH: h.SSH}, true
+			}
 			switch {
 			case !ok:
 				say("%s: runs hollow %s, this phaethon carries %s — it was not set up by phaethon; `phaethon host add` it to manage it", h.Name, h.Version, want)
